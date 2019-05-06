@@ -1,0 +1,97 @@
+version: '3.6'
+
+services:
+
+  web:
+    build:
+      context: ./services/web
+      dockerfile: Dockerfile
+    expose:
+      - 5000
+    container_name: web
+    restart: unless-stopped
+    tty: true
+    #working_dir: /home/app
+    #extra_hosts:
+    #  - "internal_host:172.27.0.1"
+    env_file:
+      - .env
+    environment:
+      SERVICE_NAME: web
+    depends_on:
+      - db
+    networks:
+      - app
+    volumes:
+       - type: "bind"
+         source: "./services/web"
+         target: "/home/app/web"
+    #  - .:/home/app/web
+    #  #- ./services/web:/home/app/web/
+
+  db:
+    build:
+      context: ./services/db
+      dockerfile: Dockerfile
+    #image: mysql:5.7.22
+    container_name: db
+    restart: unless-stopped
+    tty: true
+    ports:
+      - "33062:3306"
+    volumes:
+      - data-volume:/var/lib/mysql/
+      #- ./mysql/my.cnf:/etc/mysql/my.cnf
+    env_file:
+      - .env
+    networks:
+      - app
+
+  #Nginx Service
+  webserver:
+    build:
+        context: ./services/nginx
+        dockerfile: Dockerfile
+    restart: always
+    #image: nginx:alpine
+    container_name: webserver
+    environment:
+      SERVICE_NAME: webserver
+    restart: unless-stopped
+    tty: true
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./:/home/app/web
+    #  - ./:/home/app
+    #  - ./webservices/nginx/conf.d/:/etc/nginx/conf.d/
+    networks:
+      - app
+    depends_on:
+      - web
+
+  # Forr phpmyadmin
+  pma:
+      image: phpmyadmin/phpmyadmin
+      container_name: phpmyadmin
+      restart: always
+      volumes:
+        - ./:/home/app/web
+      ports:
+        - "8000:80"
+      depends_on:
+        - db
+      environment:
+        PMA_HOST: db
+        PMA_PORT: 3306
+      networks:
+        - app
+
+networks:
+  app:
+    driver: bridge
+
+volumes:
+  data-volume:
+    driver: local
